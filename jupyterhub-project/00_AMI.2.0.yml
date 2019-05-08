@@ -667,7 +667,7 @@ Mappings:
       Arch: NATHVM64
   AWSRegionArch2AMI:
     us-east-1:
-      HVM64: ami-0de53d8956e8dcf80
+      HVM64: ami-098bb5d92c8886ca1
       HVMG2: ami-0aeb704d503081ea6
     us-west-2:
       HVM64: ami-01e24be29428c15b2

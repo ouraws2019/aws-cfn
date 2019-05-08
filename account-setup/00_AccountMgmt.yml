@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Account & Billing Management
+Resources:
+  BillingTopic:
+    Type: "AWS::SNS::Topic"
+    Properties: 
+      DisplayName: 'Account & Billing Management'
+      Subscription:
+      - Endpoint: !Ref AccountEmail
+        Protocol: 'email'
+      TopicName: 'AcctBill'
+  BillingAlarm:
+    Type: "AWS::CloudWatch::Alarm"
+    Properties:
+      AlarmDescription: !Sub 'Alarm if Spending is over $${AlarmThreshold}'
+      ActionsEnabled: 'true'
+      AlarmActions: 
+      - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:AcctBill'
+      InsufficientDataActions:
+      - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:AcctBill'
+      AlarmName: 'BillingAlarm'
+      Namespace: 'AWS/Billing'
+      ComparisonOperator: 'GreaterThanThreshold'
+      Dimensions:
+      - Name: 'Currency'
+        Value: 'USD'
+      EvaluationPeriods: '1'
+      MetricName: 'EstimatedCharges'
+      Period: '21600'
+      Statistic: 'Maximum'
+      Threshold: 
+        Ref: "AlarmThreshold"
+Parameters:
+  AccountEmail: 
+    Description: Account Owner Email Address
+    Type: String
+    Default: admin@example.com
+    AllowedPattern: '\w[a-zA-Z0-9_\-\.]*@\w[a-zA-Z0-9\-\.]*'
+    ConstraintDescription: Must be a valid email address.
+    MinLength: '6'
+    MaxLength: '64'
+  AlarmThreshold: 
+    Description: Alarm Threshold in USD($)
+    Type: String
+    Default: 10
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Account & Billing Mgmt"
+        Parameters:
+          - AccountEmail
+          - AlarmThreshold
+    ParameterLabels:
+      AccountEmail:
+        default: "admin@example.com"
+      AlarmThreshold: 
+        default: "Alarm Threshold ($)"
+
+

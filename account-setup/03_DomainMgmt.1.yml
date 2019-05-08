@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Domain Management
+Resources:
+  DomainHostedZone:
+    Condition: cCreateDomainHostedZone
+    Type: AWS::Route53::HostedZone
+    Properties:
+        HostedZoneConfig:
+          Comment: 'Domain Hosted Zone'
+        Name: !Ref DomainName
+        HostedZoneTags:
+          -
+            Key: Name
+            Value: 'DomainHostedZone'
+  CorpHostedZone:
+    Condition: cCreateCorpHostedZone
+    Type: AWS::Route53::HostedZone
+    Properties:
+        HostedZoneConfig:
+          Comment: 'Corp Hosted Zone'
+        Name: !Ref CorpName
+        HostedZoneTags:
+          -
+            Key: Name
+            Value: 'CorpHostedZone'
+        VPCs:
+          - 
+            VPCId: !Ref VpcId
+            VPCRegion: !Ref AWS::Region
+  DomainCertificate:
+    Condition: cCreateDomainCertificate
+    Type: "AWS::CertificateManager::Certificate"
+    Properties: 
+      DomainName: !Ref DomainName
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          ValidationDomain: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Join ['', [ '*.', !Ref 'DomainName']]
+      Tags:
+        -
+          Key: Name
+          Value: 'DomainCertificate'
+Conditions:
+  cCreateDomainHostedZone: !Equals [ !Ref CreateDomainHostedZone, "Y" ]
+  cCreateDomainCertificate: !Equals [ !Ref CreateDomainCertificate, "Y" ]
+  cCreateCorpHostedZone: !Equals [ !Ref CreateCorpHostedZone, "Y" ]
+Parameters:
+  DomainName:
+    Description: Domain name for Account (eg example.com)
+    Type: String
+    AllowedPattern: "[a-z0-9]*.*"
+    Default: 'example.com'
+  CreateDomainHostedZone:  
+    Description: Create New Route53 Hosted Zone for Domain (Y/N)?
+    Type: String
+    Default: Y
+    AllowedValues:
+        - Y
+        - N    
+  CreateDomainCertificate:
+    Description: Create Certificate for Domain (Y/N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N  
+  CorpName:
+    Description: Corporation name for Account (eg example.com)
+    Type: String
+    AllowedPattern: "[a-z0-9]*.*"
+    Default: 'example.com'
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: VpcId of your existing Virtual Private Cloud (VPC)
+    ConstraintDescription: must be the VPC Id of an existing Virtual Private Cloud.
+  CreateCorpHostedZone:  
+    Description: Create New Route53 Hosted Zone for Corporation (Y/N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N  
+Outputs:
+  DomainHostedZone:
+    Condition: cCreateDomainHostedZone
+    Description: Returns the hosted zone ID,
+    Value: !Ref DomainHostedZone
+    Export: 
+      Name: 'DomainHostedZone'
+  DomainHostedZoneNameServers:
+    Condition: cCreateDomainHostedZone
+    Description: Returns the set of name servers for the specific hosted zone. 
+    Value: !Join
+        - ','
+        - !GetAtt DomainHostedZone.NameServers
+    Export: 
+      Name: 'DomainHostedZone-NameServers'
+  DomainCertificate:
+    Condition: cCreateDomainCertificate
+    Description: Returns the certificate Amazon Resource Name (ARN)
+    Value: !Ref DomainCertificate
+    Export: 
+      Name: 'DomainCertificate'
+  CorpHostedZone:
+    Condition: cCreateCorpHostedZone
+    Description: Returns the hosted zone ID,
+    Value: !Ref CorpHostedZone
+    Export: 
+      Name: 'CorpHostedZone'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Domain Management"
+        Parameters:
+          - DomainName
+          - CreateDomainHostedZone
+          - CreateDomainCertificate
+          - CorpName
+          - CreateCorpHostedZone
+          - VpcId
+    ParameterLabels:
+      DomainName:
+        default: "Domain Name"
+      CreateDomainHostedZone: 
+        default: "Domain Hosted Zone"
+      CreateDomainCertificate:
+        default: "Domain Certificate"
+      CorpName:
+        default: "Corp Name"
+      CreateCorpHostedZone: 
+        default: "Corp Hosted Zone"
+      VpcId:
+        default: "VpcId"
+
+
+

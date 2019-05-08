@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Identity Management
+Resources:
+  AdminGroup:
+    Type: "AWS::IAM::Group"
+    Properties:
+      GroupName: 'AccountAdmins'
+      ManagedPolicyArns: ['arn:aws:iam::aws:policy/AdministratorAccess']
+  AdminUser:
+    DependsOn: ["AdminGroup"]
+    Type: "AWS::IAM::User"
+    Properties: 
+      Groups:
+        - !Ref "AdminGroup"
+      LoginProfile:
+        Password: !Ref AdminUserPassword
+        PasswordResetRequired: 'false'
+      UserName: !Ref AdminUserUserName
+  AdminAccessKey:
+    Condition: cCreateCredentials
+    DependsOn: ["AdminUser"]
+    Type: "AWS::IAM::AccessKey"
+    Properties: 
+      Serial: 1
+      Status: 'Active'
+      UserName: !Ref AdminUserUserName
+Conditions:
+  cCreateCredentials: !Equals [ !Ref CreateCredentials, "Y" ]
+Outputs:
+  AdminGroup:
+    Description: Returns the value of the Group Name
+    Value: !Ref AdminGroup
+    Export: 
+      Name: 'AccountAdmins'
+  AdminUser:
+    Description: Returns the value of the UserName
+    Value: !Ref AdminUser
+    Export: 
+      Name: 'AdminUser'
+  AdminUserArn:
+    Description: Returns the value of the UserName
+    Value: !GetAtt AdminUser.Arn
+    Export: 
+      Name: AdminUserArn
+  AdminAccessKey:
+    Condition: cCreateCredentials
+    Description: Returns the AccessKeyId.
+    Value: !Ref AdminAccessKey
+    Export: 
+      Name: 'AdminAccessKey'
+  AdminSecretAccessKey:
+    Condition: cCreateCredentials
+    Description: Returns the SecretAccessKey.
+    Value: !GetAtt AdminAccessKey.SecretAccessKey
+    Export: 
+      Name: 'AdminSecretAccessKey'
+Parameters:
+  AdminUserUserName:
+    Type: String
+    Description: A name for the IAM User who should be the Account Admin.
+    Default: 'Firstname.Lastname' 
+  AdminUserPassword:
+    Type: String
+    Description: Account Admin Password
+    NoEcho: 'true'
+    AllowedPattern: '[a-zA-z0-9!@#$%]*'
+    MinLength: '6'
+    MaxLength: '24'
+    ConstraintDescription: Must contain at least one lowercase, uppercase, number and non-alphanumeric character.
+  CreateCredentials:  
+    Description: Create Programmatic Security Credentials (Y|N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N   
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Security Identity Compliance"
+        Parameters:
+          - AdminUserUserName
+          - AdminUserPassword
+          - CreateCredentials
+    ParameterLabels:
+      AdminUserUserName:
+        default: "Account Admin"
+      AdminUserPassword:
+        default: "Admin Password"
+      CreateCredentials:
+        default: "Y|N"

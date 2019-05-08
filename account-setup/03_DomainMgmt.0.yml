@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Domain Management
+Resources:
+  DomainHostedZone:
+    Condition: cCreateHostedZone
+    Type: AWS::Route53::HostedZone
+    Properties:
+        HostedZoneConfig:
+          Comment: 'Domain Hosted Zone'
+        Name: !Ref DomainName
+        HostedZoneTags:
+          -
+            Key: Name
+            Value: 'DomainHostedZone'
+  DomainCertificate:
+    Condition: cCreateCertificate
+    Type: "AWS::CertificateManager::Certificate"
+    Properties: 
+      DomainName: !Ref DomainName
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          ValidationDomain: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Join ['', [ '*.', !Ref 'DomainName']]
+      Tags:
+        -
+          Key: Name
+          Value: 'DomainCertificate'
+Conditions:
+  cCreateHostedZone: !Equals [ !Ref CreateHostedZone, "Y" ]
+  cCreateCertificate: !Equals [ !Ref CreateCertificate, "Y" ]
+Parameters:
+  DomainName:
+    Description: Domain name for Account (eg example.com)
+    Type: String
+    AllowedPattern: "[a-z0-9]*.*"
+    Default: 'example.com'
+  CreateHostedZone:  
+    Description: Create New Route53 Hosted Zone for Domain (Y/N)?
+    Type: String
+    Default: Y
+    AllowedValues:
+        - Y
+        - N    
+  CreateCertificate:
+    Description: Create Certificate for Domain (Y/N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N    
+Outputs:
+  DomainHostedZone:
+    Condition: cCreateHostedZone
+    Description: Returns the hosted zone ID,
+    Value: !Ref DomainHostedZone
+    Export: 
+      Name: 'DomainHostedZone'
+  DomainHostedZoneNameServers:
+    Condition: cCreateHostedZone
+    Description: Returns the set of name servers for the specific hosted zone. 
+    Value: !Join
+        - ','
+        - !GetAtt DomainHostedZone.NameServers
+    Export: 
+      Name: 'DomainHostedZone-NameServers'
+  DomainCertificate:
+    Condition: cCreateCertificate
+    Description: Returns the certificate Amazon Resource Name (ARN)
+    Value: !Ref DomainCertificate
+    Export: 
+      Name: 'DomainCertificate'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Domain Management"
+        Parameters:
+          - DomainName
+          - CreateHostedZone
+          - CreateCertificate
+    ParameterLabels:
+      DomainName:
+        default: "example.com"
+      CreateHostedZone: 
+        default: "Y/N"
+      CreateCertificate:
+        default: "Y/N"
+
+
+

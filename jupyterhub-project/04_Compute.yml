@@ -1,0 +1,441 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Compute Management
+Resources:
+  CorpDomainController:
+    Type: 'AWS::EC2::Instance'
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          files:
+            'c:\cfn\cfn-hup.conf':
+              content: !Join 
+                - ''
+                - - |
+                    [main]
+                  - stack=
+                  - !Ref 'AWS::StackId'
+                  - |+
+
+                  - region=
+                  - !Ref 'AWS::Region'
+                  - |+
+
+            'c:\cfn\hooks.d\cfn-auto-reloader.conf':
+              content: !Join 
+                - ''
+                - - |
+                    [cfn-auto-reloader-hook]
+                  - |
+                    triggers=post.update
+                  - >
+                    path=Resources.CorpDomainController.Metadata.AWS::CloudFormation::Init
+                  - 'action=cfn-init.exe -v -s '
+                  - !Ref 'AWS::StackId'
+                  - ' -r CorpDomainController'
+                  - ' --region '
+                  - !Ref 'AWS::Region'
+                  - |+
+
+            'C:\cfn\RunCommand.bat':
+              content: |-
+                %~1
+                IF %ERRORLEVEL% GTR 10 ( exit /b 1 ) else ( exit /b 0 )
+          commands:
+            1-run-dcpromo:
+              command: !Join 
+                - ''
+                - - >-
+                    C:\cfn\RunCommand.bat "dcpromo /unattend 
+                    /ReplicaOrNewDomain:Domain  /NewDomain:Forest 
+                    /NewDomainDNSName:
+                  - !Ref CorpDomainDNSName
+                  - '  /ForestLevel:4 /DomainNetbiosName:'
+                  - !Ref CorpDomainNetBIOSName
+                  - ' /DomainLevel:4  /InstallDNS:Yes  /ConfirmGc:Yes  /CreateDNSDelegation:No  /DatabasePath:"C:\Windows\NTDS"  /LogPath:"C:\Windows\NTDS"  /SYSVOLPath:"C:\Windows\SYSVOL" /SafeModeAdminPassword='
+                  - !Ref RestoreModePassword
+                  - ' /RebootOnCompletion:Yes"'
+              waitAfterCompletion: forever
+            2-signal-success:
+              command: !Join 
+                - ''
+                - - cfn-signal.exe -e 0 "
+                  - !Base64 
+                    Ref: CorpDomainControllerWaitHandle
+                  - '"'
+          services:
+            windows:
+              cfn-hup:
+                enabled: 'true'
+                ensureRunning: 'true'
+                files:
+                  - 'c:\cfn\cfn-hup.conf'
+                  - 'c:\cfn\hooks.d\cfn-auto-reloader.conf'
+    Properties:
+      ImageId: !FindInMap 
+        - AWSRegion2AMI
+        - !Ref 'AWS::Region'
+        - !Ref WindowsVersion #Windows2008r2
+      InstanceType: !Ref InstanceType
+      SecurityGroupIds: 
+        - !Ref CorpDomainControllerSecurityGroup
+      AvailabilityZone: !Ref AvailabilityZone
+      SubnetId: !Ref CorpSubnetId
+      KeyName: !Ref CorpEC2KeyPair
+      UserData: !Base64 
+        'Fn::Join':
+          - ''
+          - - |
+              <script>
+            - 'cfn-init.exe -v -s '
+            - !Ref 'AWS::StackId'
+            - ' -r CorpDomainController '
+            - ' --region '
+            - !Ref 'AWS::Region'
+            - |+
+
+            - </script>
+      Tags:
+        - Key: Name
+          Value: CorpDomainController
+  CorpDomainControllerWaitCondition:
+    Type: 'AWS::CloudFormation::WaitCondition'
+    DependsOn: CorpDomainController
+    Properties:
+      Handle: !Ref CorpDomainControllerWaitHandle
+      Timeout: '3000'
+  CorpDomainControllerWaitHandle:
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+  CorpDomainControllerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Corp Domain Controller
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: '123'
+          ToPort: '123'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '135'
+          ToPort: '135'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '138'
+          ToPort: '138'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '1024'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '389'
+          ToPort: '389'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '389'
+          ToPort: '389'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '636'
+          ToPort: '636'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '3268'
+          ToPort: '3268'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '3269'
+          ToPort: '3269'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '53'
+          ToPort: '53'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '53'
+          ToPort: '53'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '88'
+          ToPort: '88'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '88'
+          ToPort: '88'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '445'
+          ToPort: '445'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '445'
+          ToPort: '445'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: udp
+          FromPort: '135'
+          ToPort: '135'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: !Ref OnPremCidr
+        - IpProtocol: '-1'
+          FromPort: '0'
+          ToPort: '65535'
+          CidrIp: !Ref OnPremCidr
+        - IpProtocol: icmp
+          FromPort: '-1'
+          ToPort: '-1'
+          SourceSecurityGroupId: !Ref CorpDomainMemberSecurityGroup
+      VpcId: !Ref CorpVpcId
+      Tags:
+        - Key: Name
+          Value: CorpDomainControllerSecurityGroup
+  CorpDomainMemberSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Domain Members
+      SecurityGroupIngress: []
+      VpcId: !Ref CorpVpcId
+      Tags:
+        - Key: Name
+          Value: CorpDomainMemberSecurityGroup
+  CorpDomainMemberSecurityGroupIngress1:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      #GroupName: !Ref CorpDomainMemberSecurityGroup
+      GroupId: !Ref CorpDomainMemberSecurityGroup
+      IpProtocol: tcp
+      FromPort: '3389'
+      ToPort: '3389'
+      CidrIp: !Ref OnPremCidr
+Outputs:
+  CorpDomainControllerDNSName:
+    Value: !GetAtt 
+      - CorpDomainController
+      - PublicDnsName
+    Description: Public DNS name of Active Directory server for RDP connection
+  CorpDomainControllerIP:
+    Value: !GetAtt 
+      - CorpDomainController
+      - PrivateIp
+    Description: Private IP address of Active Directory server which is also a DNS server
+  CorpDomainAdmin:
+    Value: !Join 
+      - ''
+      - - !Ref CorpDomainNetBIOSName
+        - \Administrator
+    Description: Default domain administrator account
+  CorpDomainAdminPassword:
+    Value: Please retrieve Administrator password of the instance
+Parameters:
+  AvailabilityZone:
+    Description: AWS Availability Zone
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1a
+  CorpVpcId:
+    Description: VPC Id
+    Type: AWS::EC2::VPC::Id
+  CorpSubnetId:
+    Description: VPC SubnetId
+    Type: AWS::EC2::Subnet::Id
+  CorpEC2KeyPair:
+    Description: Name of an existing EC2 KeyPair
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  InstanceType:
+    Description: Amazon EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - m1.small
+      - m1.medium
+      - m1.large
+      - m1.xlarge
+      - m2.xlarge
+      - m2.2xlarge
+      - m2.4xlarge
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m3.2xlarge
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - c1.medium
+      - c1.xlarge
+      - c3.large
+      - c3.xlarge
+      - c3.2xlarge
+      - c3.4xlarge
+      - c3.8xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+      - g2.2xlarge
+      - r3.large
+      - r3.xlarge
+      - r3.2xlarge
+      - r3.4xlarge
+      - r3.8xlarge
+      - i2.xlarge
+      - i2.2xlarge
+      - i2.4xlarge
+      - i2.8xlarge
+      - d2.xlarge
+      - d2.2xlarge
+      - d2.4xlarge
+      - d2.8xlarge
+      - hi1.4xlarge
+      - hs1.8xlarge
+      - cr1.8xlarge
+      - cc2.8xlarge
+      - cg1.4xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  WindowsVersion:
+    Description: Windows Version
+    Type: String
+    Default: 'Windows2008r2'
+    AllowedValues: 
+      - Windows2008r2
+      - Windows2012r2
+  CorpDomainDNSName:
+    Description: >-
+      Fully qualified domain name (FQDN) of the forest root domain e.g.
+      corp.example.com
+    Type: String
+    MinLength: '3'
+    MaxLength: '25'
+    AllowedPattern: '[a-zA-Z0-9]+\..+'
+  CorpDomainNetBIOSName:
+    Description: >-
+      NetBIOS name of the domain (upto 15 characters) for users of earlier
+      versions of Windows e.g. CORP
+    Type: String
+    MinLength: '1'
+    MaxLength: '15'
+    AllowedPattern: '[a-zA-Z0-9]+'
+  RestoreModePassword:
+    Description: >-
+      Password for a separate Administrator account when the domain controller
+      is in Restore Mode. Must be at least 8 characters containing letters,
+      numbers and symbols
+    Type: String
+    MinLength: '8'
+    MaxLength: '32'
+    AllowedPattern: >-
+      (?=^.{6,255}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*
+    NoEcho: 'True'
+  OnPremCidr:
+    Description: >-
+      IP Cidr from which you are likely to RDP into the instances. You can add
+      rules later by modifying the created security groups e.g. 54.32.98.160/32
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    AllowedPattern: '^([0-9]+\.){3}[0-9]+\/[0-9]+$'
+Mappings:
+  AWSRegion2AMI:
+    us-east-1:
+      Windows2008r2: ami-0509af5ff9695a433
+      #Windows2012r2: ami-0d99daa98c8711fe1
+      Windows2012r2:  ami-04839a77f4ee0d92a
+    us-west-2:
+      Windows2008r2: ami-0d725250b69cae269
+      Windows2012r2: ami-02e27664434db6def
+    us-west-1:
+      Windows2008r2: ami-0cd391ee2ad7d80b0
+      Windows2012r2: ami-04370c2a300903acc
+    eu-west-1:
+      Windows2008r2: ami-0ffffc9a085b90ffa
+      Windows2012r2: ami-01dbaf1c50a36891d
+    eu-west-2:
+      Windows2008r2: ami-0772b918d115fe008
+      Windows2012r2: ami-0a7551990da17b8d6
+    eu-west-3:
+      Windows2008r2: ami-0956e0f47ca40b5bb
+      Windows2012r2: ami-040ef025ec13d58bf
+    eu-central-1:
+      Windows2008r2: ami-0eb471abeccbcd912
+      Windows2012r2: ami-0d55859ee09a59138
+    ap-northeast-1:
+      Windows2008r2: ami-0e850e62213220c82
+      Windows2012r2: ami-0a45b66bda01c89c8
+    ap-northeast-2:
+      Windows2008r2: ami-00cda273ecf46d99e
+      Windows2012r2: ami-0b3a3970b73d5b63a
+    ap-northeast-3:
+      Windows2008r2: ami-003051ef4ceec8d27
+      Windows2012r2: ami-0b080b2ee57fa5e3d
+    ap-southeast-1:
+      Windows2008r2: ami-07d277db8f3dcbb5b
+      Windows2012r2: ami-0bf96f139bff648cc
+    ap-southeast-2:
+      Windows2008r2: ami-01d0a8d5f9671d888
+      Windows2012r2: ami-0664c039c4dea5193
+    ap-south-1:
+      Windows2008r2: ami-0131b74fc8bfa2b67
+      Windows2012r2: ami-0bd1dc65d74266ee2
+    us-east-2:
+      Windows2008r2: ami-0935776807b87a59e
+      Windows2012r2: ami-0679e5ac84d15f15e
+    ca-central-1:
+      Windows2008r2: ami-07f0454772df58f58
+      Windows2012r2: ami-0a27bbef221046aae
+    sa-east-1:
+      Windows2008r2: ami-07ddb1a3b50d0e91f
+      Windows2012r2: ami-01d74c2e93478e2f5
+    cn-north-1:
+      Windows2008r2: ami-014020ef82f20dc97
+      Windows2012r2: ami-0aefdd3cc86bdb17d
+    cn-northwest-1:
+      Windows2008r2: ami-08a83481445dcf342
+      Windows2012r2: ami-08922e8cdfa19cd6e
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Compute Management"
+        Parameters:
+          - AvailabilityZone
+          - CorpVpcId
+          - CorpSubnetId
+          - CorpEC2KeyPair
+          - InstanceType
+          - WindowsVersion
+          - CorpDomainDNSName
+          - CorpDomainNetBIOSName
+          - RestoreModePassword
+          - OnPremCidr
+    ParameterLabels:
+      AvailabilityZone: 
+        default: "Availability Zone"
+      CorpVpcId: 
+        default: "VPC Id"
+      CorpSubnetId: 
+        default: "Subnet Id"
+      CorpEC2KeyPair: 
+        default: "EC2 KeyPair"
+      InstanceType:
+        default: "Instance Type"
+      WindowsVersion:
+        default: "Windows Version"
+      CorpDomainDNSName:
+        default: "Domain DNS Name"
+      CorpDomainNetBIOSName:
+        default: "Domain NetBIOS Name"
+      RestoreModePassword:
+        default: "Domain Password"
+      OnPremCidr:
+        default: "OnPremise CIDR"
+
+
+

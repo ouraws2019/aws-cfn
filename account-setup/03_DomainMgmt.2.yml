@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Domain Management
+Resources:
+  PublicHostedZone:
+    Condition: cCreatePublicHostedZone
+    Type: AWS::Route53::HostedZone
+    Properties:
+        HostedZoneConfig:
+          Comment: 'Domain Hosted Zone'
+        Name: !Ref DomainName
+        HostedZoneTags:
+          -
+            Key: Name
+            Value: 'PublicHostedZone'
+  PrivateHostedZone:
+    Condition: cCreatePrivateHostedZone
+    Type: AWS::Route53::HostedZone
+    Properties:
+        HostedZoneConfig:
+          Comment: 'Corp Hosted Zone'
+        Name: !Ref PrivateDomainName
+        HostedZoneTags:
+          -
+            Key: Name
+            Value: 'PrivateHostedZone'
+        VPCs:
+          - 
+            VPCId: !Ref VpcId
+            VPCRegion: !Ref AWS::Region
+  DomainCertificate:
+    Condition: cCreateDomainCertificate
+    Type: "AWS::CertificateManager::Certificate"
+    Properties: 
+      DomainName: !Ref DomainName
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          ValidationDomain: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Join ['', [ '*.', !Ref 'DomainName']]
+      Tags:
+        -
+          Key: Name
+          Value: 'DomainCertificate'
+Conditions:
+  cCreatePublicHostedZone: !Equals [ !Ref CreatePublicHostedZone, "Y" ]
+  cCreateDomainCertificate: !Equals [ !Ref CreateDomainCertificate, "Y" ]
+  cCreatePrivateHostedZone: !Equals [ !Ref CreatePrivateHostedZone, "Y" ]
+Parameters:
+  DomainName:
+    Description: Domain name for Account (eg example.com)
+    Type: String
+    AllowedPattern: "[a-z0-9]*.*"
+    Default: 'example.com'
+  CreatePublicHostedZone:  
+    Description: Create New Route53 Hosted Zone for Domain (Y/N)?
+    Type: String
+    Default: Y
+    AllowedValues:
+        - Y
+        - N    
+  CreateDomainCertificate:
+    Description: Create Certificate for Domain (Y/N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N  
+  PrivateDomainName:
+    Description: Private Domain name for Account (eg private.example.com)
+    Type: String
+    AllowedPattern: "[a-z0-9]*.*"
+    Default: 'private.example.com'
+  VpcId:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: VpcId of your existing Virtual Private Cloud (VPC)
+    ConstraintDescription: must be the VPC Id of an existing Virtual Private Cloud.
+  CreatePrivateHostedZone:  
+    Description: Create New Route53 Hosted Zone for Corporation (Y/N)?
+    Type: String
+    Default: N
+    AllowedValues:
+        - Y
+        - N  
+Outputs:
+  PublicHostedZone:
+    Condition: cCreatePublicHostedZone
+    Description: Returns the hosted zone ID,
+    Value: !Ref PublicHostedZone
+    Export: 
+      Name: 'PublicHostedZone'
+  PublicHostedZoneNameServers:
+    Condition: cCreatePublicHostedZone
+    Description: Returns the set of name servers for the specific hosted zone. 
+    Value: !Join
+        - ','
+        - !GetAtt PublicHostedZone.NameServers
+    Export: 
+      Name: 'PublicHostedZone-NameServers'
+  DomainCertificate:
+    Condition: cCreateDomainCertificate
+    Description: Returns the certificate Amazon Resource Name (ARN)
+    Value: !Ref DomainCertificate
+    Export: 
+      Name: 'DomainCertificate'
+  PrivateHostedZone:
+    Condition: cCreatePrivateHostedZone
+    Description: Returns the hosted zone ID,
+    Value: !Ref PrivateHostedZone
+    Export: 
+      Name: 'PrivateHostedZone'
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Domain Management"
+        Parameters:
+          - DomainName
+          - CreatePublicHostedZone
+          - CreateDomainCertificate
+          - PrivateDomainName
+          - CreatePrivateHostedZone
+          - VpcId
+    ParameterLabels:
+      DomainName:
+        default: "Domain Name"
+      CreatePublicHostedZone: 
+        default: "Domain Hosted Zone"
+      CreateDomainCertificate:
+        default: "Domain Certificate"
+      PrivateDomainName:
+        default: "Corp Name"
+      CreatePrivateHostedZone: 
+        default: "Corp Hosted Zone"
+      VpcId:
+        default: "VpcId"
+
+
+
